@@ -11,6 +11,10 @@ const hpp = require('hpp');
 const compression = require('compression');
 const amqp = require('amqplib');
 
+
+// Import RabbitMQ service
+const rabbitMQService = require('./services/rabbitmq');
+
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const clientRoutes = require('./routes/clients');
@@ -63,19 +67,20 @@ app.use('/api/admin', adminRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.status(200).json({
-        status: 'success',
-        message: 'Server is running',
-        timestamp: new Date().toISOString()
-    });
+  res.status(200).json({
+    status: 'success',
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    rabbitmq: rabbitMQService.isReady() ? 'connected' : 'disconnected'
+  });
 });
 
 // 404 handler
-app.all('*', (req, res) => {
-    res.status(404).json({
-        status: 'error',
-        message: `Can't find ${req.originalUrl} on this server!`
-    });
+app.all('/:id', (req, res) => {
+  res.status(404).json({
+    status: 'error',
+    message: `Can't find ${req.originalUrl} on this server!`
+  });
 });
 
 // Global error handler
@@ -109,8 +114,6 @@ const connectRabbitMQ = async () => {
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
 }).then(() => {
     console.log('Connected to MongoDB');
 }).catch(err => {
@@ -127,4 +130,6 @@ app.listen(PORT, () => {
 // Connect to RabbitMQ
 connectRabbitMQ();
 
-module.exports = { app, rabbitChannel };
+
+
+module.exports = app;

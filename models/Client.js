@@ -11,6 +11,21 @@ const ClientSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    isDeleted: {
+        type: Boolean,
+        default: false,
+    },
+    deletedAt: {
+        type: Date,
+    },
+    isBlocked: {
+        type: Boolean,
+        default: false
+    },
+    blockedReason: String,
+    blockedBy: {
+        type: String,
+    },
     description: String,
     apiKey: {
         type: String,

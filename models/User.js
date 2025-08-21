@@ -71,7 +71,17 @@ const UserSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    isDeleted: {
+        type: Boolean,
+        default: false,
+    },
+    deletedAt: {
+        type: Date,
+    },
     blockedReason: String,
+    blockedBy: {
+        type: String,
+    },
     lastLogin: Date,
     loginAttempts: {
         type: Number,
@@ -146,4 +156,4 @@ UserSchema.methods.incrementLoginAttempts = function () {
     return this.updateOne(updates);
 };
 
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('Authentication_User', UserSchema);
