@@ -110,7 +110,7 @@ passport.use(new GitHubStrategy({
 }));
 
 // Register new user
-router.post('/register', [
+router.post('/auth/register', [
     body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
     body('email').isEmail().withMessage('Please provide a valid email'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
