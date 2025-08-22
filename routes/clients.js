@@ -6,11 +6,13 @@ const Client = require('../models/Client');
 const AuditLog = require('../models/AuditLog');
 const rabbitMQService = require('../services/rabbitmq');
 const crypto = require('crypto');
+const passport = require('passport');
 
 const router = express.Router();
 
 // Only admins can access client management
-router.use(authenticate, authorize('admin'));
+// router.use(authenticate, authorize('admin'));
+// router.use(authenticate);
 
 // Get all clients
 router.get('/', async (req, res, next) => {
@@ -82,6 +84,7 @@ router.post('/', [
     body('otpTemplate.subject').optional().trim()
 ], async (req, res, next) => {
     try {
+        console.log(req.body)
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({
@@ -105,7 +108,7 @@ router.post('/', [
                 expiration: otpTemplate.expiration || 15,
                 subject: otpTemplate.subject || 'Your Verification Code'
             },
-            createdBy: req.user.userId
+            // createdBy: req.user.userId
         });
 
         await client.save();
@@ -113,7 +116,7 @@ router.post('/', [
         // Create audit log
         const auditLog = {
             action: 'client_created',
-            userId: req.user.userId,
+            // userId: req.user.userId,
             clientId: client._id,
             ipAddress: req.ip,
             userAgent: req.get('User-Agent'),
@@ -307,5 +310,7 @@ router.delete('/:id', async (req, res, next) => {
         next(error);
     }
 });
+
+
 
 module.exports = router;

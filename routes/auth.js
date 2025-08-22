@@ -110,13 +110,15 @@ passport.use(new GitHubStrategy({
 }));
 
 // Register new user
-router.post('/auth/register', [
+router.post('/register', [
     body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
     body('email').isEmail().withMessage('Please provide a valid email'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-    body('clientApiKey').notEmpty().withMessage('Client API key is required')
+    // body('clientApiKey').notEmpty().withMessage('Client API key is required')
 ], async (req, res, next) => {
     try {
+
+        console.log(req.body)
         // Validate input
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -127,7 +129,8 @@ router.post('/auth/register', [
             });
         }
 
-        const { name, email, password, clientApiKey } = req.body;
+        const { name, email, password, clientApiKey
+        } = req.body;
 
         // Verify client API key
         const client = await Client.findOne({ apiKey: clientApiKey, isActive: true });

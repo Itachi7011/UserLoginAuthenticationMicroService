@@ -9,7 +9,7 @@ const TokenSchema = new mongoose.Schema({
     },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Client',
         required: true
     },
     type: {
@@ -36,4 +36,4 @@ const TokenSchema = new mongoose.Schema({
 // Index for automatic expiration
 TokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-module.exports = mongoose.model('Login_User_Token', TokenSchema);
+module.exports = mongoose.model('Login_Client_Token', TokenSchema);

@@ -6,19 +6,24 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
+// const xss = require('xss-clean');
 const hpp = require('hpp');
 const compression = require('compression');
 const amqp = require('amqplib');
+const passport = require('passport');
 
 
 // Import RabbitMQ service
 const rabbitMQService = require('./services/rabbitmq');
 
+require('./config/passport'); 
+
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const clientRoutes = require('./routes/clients');
 const adminRoutes = require('./routes/admin');
+const clientAuthRoutes = require('./routes/clientAuth');
+
 
 const app = express();
 
@@ -48,10 +53,15 @@ app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // Data sanitization against NoSQL query injection
-app.use(mongoSanitize());
+// app.use(mongoSanitize({
+//   replaceWith: '_',
+//   onSanitize: ({ req, key }) => {
+//     console.warn(`Sanitized ${key} in request`);
+//   }
+// }));
 
 // Data sanitization against XSS
-app.use(xss());
+// app.use(xss());
 
 // Prevent parameter pollution
 app.use(hpp());
@@ -64,6 +74,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/client-auth', clientAuthRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

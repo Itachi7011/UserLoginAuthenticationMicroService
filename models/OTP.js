@@ -35,4 +35,4 @@ const OTPSchema = new mongoose.Schema({
 // Index for automatic expiration
 OTPSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-module.exports = mongoose.model('OTP', OTPSchema);
+module.exports = mongoose.model('Login_OTP', OTPSchema);

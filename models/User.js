@@ -67,6 +67,24 @@ const UserSchema = new mongoose.Schema({
         type: String,
         enum: ['read', 'write', 'delete', 'manage_users']
     }],
+    website: {
+        type: String,
+        required: true
+    },
+    apiKey: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    secretKey: {
+        type: String,
+        required: true
+    },
+    otp: {
+        type: String,
+        required: true,
+        unique: true
+    },
     isBlocked: {
         type: Boolean,
         default: false
@@ -88,7 +106,6 @@ const UserSchema = new mongoose.Schema({
         default: 0
     },
     lockUntil: Date,
-    apiKey: String,
     subscription: {
         plan: {
             type: String,
@@ -109,9 +126,32 @@ const UserSchema = new mongoose.Schema({
     clientId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Client'
+    },
+
+    // NEW: Custom attributes field for flexible client-specific data
+    customAttributes: {
+        type: Map,
+        of: mongoose.Schema.Types.Mixed, // Allows any type of value
+        default: new Map()
     }
 }, {
-    timestamps: true
+    timestamps: true,
+
+    // NEW: Transform to convert Map to Object for JSON responses
+    toJSON: {
+        virtuals: true,
+        transform: function (doc, ret) {
+            ret.customAttributes = doc.customAttributes ? Object.fromEntries(doc.customAttributes) : {};
+            return ret;
+        }
+    },
+    toObject: {
+        virtuals: true,
+        transform: function (doc, ret) {
+            ret.customAttributes = doc.customAttributes ? Object.fromEntries(doc.customAttributes) : {};
+            return ret;
+        }
+    }
 });
 
 // Virtual for checking if account is locked
@@ -138,6 +178,47 @@ UserSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
 };
 
+// NEW: Method to set custom attributes
+UserSchema.methods.setCustomAttribute = function (key, value) {
+    this.customAttributes.set(key, value);
+    return this.save();
+};
+
+// NEW: Method to get custom attribute
+UserSchema.methods.getCustomAttribute = function (key) {
+    return this.customAttributes.get(key);
+};
+
+// NEW: Method to remove custom attribute
+UserSchema.methods.removeCustomAttribute = function (key) {
+    this.customAttributes.delete(key);
+    return this.save();
+};
+
+// NEW: Method to check if custom attribute exists
+UserSchema.methods.hasCustomAttribute = function (key) {
+    return this.customAttributes.has(key);
+};
+
+// NEW: Method to get all custom attributes as plain object
+UserSchema.methods.getAllCustomAttributes = function () {
+    return Object.fromEntries(this.customAttributes);
+};
+
+// NEW: Method to set multiple custom attributes at once
+UserSchema.methods.setMultipleCustomAttributes = function (attributes) {
+    for (const [key, value] of Object.entries(attributes)) {
+        this.customAttributes.set(key, value);
+    }
+    return this.save();
+};
+
+// NEW: Method to clear all custom attributes
+UserSchema.methods.clearCustomAttributes = function () {
+    this.customAttributes.clear();
+    return this.save();
+};
+
 // Increment login attempts
 UserSchema.methods.incrementLoginAttempts = function () {
     if (this.lockUntil && this.lockUntil < Date.now()) {
@@ -156,4 +237,4 @@ UserSchema.methods.incrementLoginAttempts = function () {
     return this.updateOne(updates);
 };
 
-module.exports = mongoose.model('Authentication_User', UserSchema);
+module.exports = mongoose.model('Login_User', UserSchema);
