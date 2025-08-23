@@ -109,6 +109,11 @@ passport.use(new GitHubStrategy({
     }
 }));
 
+// Helper functions for key generation
+const generateApiKey = () => crypto.randomBytes(32).toString('hex');
+const generateSecretKey = () => crypto.randomBytes(16).toString('hex');
+const generateOTP = () => crypto.randomInt(100000, 999999).toString();
+
 // Register new user
 router.post('/register', [
     body('name').trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),

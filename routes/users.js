@@ -7,6 +7,9 @@ const Token = require('../models/Token');
 const AuditLog = require('../models/AuditLog');
 const rabbitMQService = require('../services/rabbitmq');
 const router = express.Router();
+const passport = require('passport');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -163,6 +166,72 @@ router.post('/change-password', [
         next(error);
     }
 });
+
+// Google OAuth for clients
+const generateUserToken = (user) => {
+  return jwt.sign(
+    {
+      userId: user._id,
+      email: user.email,
+      role: user.role,
+      type: 'user'
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+  );
+};
+
+// Google OAuth for users
+router.get('/google',
+  passport.authenticate('user-google', {
+    scope: ['profile', 'email'],
+    session: false
+  })
+);
+
+router.get('/google/callback',
+  passport.authenticate('user-google', {
+    failureRedirect: '/user-login?error=auth_failed',
+    session: false
+  }),
+  async (req, res) => {
+    try {
+      // Generate JWT token
+      const token = generateUserToken(req.user);
+
+      // Redirect to USER-SIDE dashboard with token
+      res.redirect(`${process.env.USER_URL || 'http://localhost:3000'}/user-dashboard?token=${token}&userId=${req.user._id}`);
+    } catch (error) {
+      res.redirect(`${process.env.USER_URL || 'http://localhost:3000'}/user-login?error=token_generation_failed`);
+    }
+  }
+);
+
+// GitHub OAuth for users
+router.get('/github',
+  passport.authenticate('user-github', {
+    scope: ['user:email'],
+    session: false
+  })
+);
+
+router.get('/github/callback',
+  passport.authenticate('user-github', {
+    failureRedirect: '/user-login?error=auth_failed',
+    session: false
+  }),
+  async (req, res) => {
+    try {
+      const token = generateUserToken(req.user);
+      // Redirect to USER-SIDE
+      res.redirect(`${process.env.USER_URL || 'http://localhost:3000'}/user-dashboard?token=${token}&userId=${req.user._id}`);
+    } catch (error) {
+      res.redirect(`${process.env.USER_URL || 'http://localhost:3000'}/user-login?error=token_generation_failed`);
+    }
+  }
+);
+
+
 
 // Get active sessions
 router.get('/sessions', async (req, res, next) => {
