@@ -244,7 +244,6 @@ router.get('/profile', async (req, res, next) => {
     try {
         // Extract client ID from token
         const authHeader = req.headers.authorization;
-        console.log(authHeader)
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({
                 status: 'error',
@@ -258,8 +257,7 @@ router.get('/profile', async (req, res, next) => {
         let decoded;
         try {
             decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
-            console.log("token is :", token);
-            console.log("decoded is :", decoded);
+
         } catch (jwtError) {
             return res.status(401).json({
                 status: 'error',
@@ -281,6 +279,283 @@ router.get('/profile', async (req, res, next) => {
         res.json({
             status: 'success',
             data: { client }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Add this route for profile updates
+router.put('/profile', [
+    body('name').optional().trim().isLength({ min: 2 }).withMessage('Name must be at least 2 characters'),
+    body('website').optional().isURL().withMessage('Please provide a valid website URL').optional({ nullable: true, checkFalsy: true }),
+    body('branding.companyName').optional().trim().optional({ nullable: true, checkFalsy: true }),
+    body('branding.primaryColor').optional().isHexColor().withMessage('Please provide a valid hex color').optional({ nullable: true, checkFalsy: true }),
+    body('branding.termsUrl').optional().isURL().withMessage('Please provide a valid URL').optional({ nullable: true, checkFalsy: true }),
+    body('branding.privacyPolicyUrl').optional().isURL().withMessage('Please provide a valid URL').optional({ nullable: true, checkFalsy: true }),
+    body('authConfig.enableMFA').optional().isBoolean().withMessage('MFA setting must be boolean'),
+    body('authConfig.requireEmailVerification').optional().isBoolean().withMessage('Email verification setting must be boolean'),
+    body('webhooks.url').optional().isURL().withMessage('Please provide a valid webhook URL').optional({ nullable: true, checkFalsy: true }),
+    body('webhooks.isActive').optional().isBoolean().withMessage('Webhook status must be boolean')
+], async (req, res, next) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Validation failed',
+                errors: errors.array()
+            });
+        }
+
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({
+                status: 'error',
+                message: 'Authentication token required'
+            });
+        }
+
+        const token = authHeader.split(' ')[1];
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+        } catch (jwtError) {
+            return res.status(401).json({
+                status: 'error',
+                message: 'Invalid or expired token'
+            });
+        }
+
+        const client = await Client.findById(decoded.clientId);
+        if (!client || client.isDeleted) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Client not found'
+            });
+        }
+
+        // Prepare update data
+        const updateData = {};
+        const updatedFields = [];
+
+        // Handle nested field updates and null values
+        Object.keys(req.body).forEach(key => {
+            if (req.body[key] === null || req.body[key] === '') {
+                // Handle null/empty values by setting to undefined (which will remove the field)
+                if (key.includes('.')) {
+                    const [parent, child] = key.split('.');
+                    if (!updateData[parent]) {
+                        updateData[parent] = client[parent] ? client[parent].toObject() : {};
+                    }
+                    updateData[parent][child] = undefined;
+                } else {
+                    updateData[key] = undefined;
+                }
+                updatedFields.push(key);
+            } else if (key.includes('.')) {
+                const [parent, child] = key.split('.');
+                if (!updateData[parent]) {
+                    updateData[parent] = client[parent] ? client[parent].toObject() : {};
+                }
+                updateData[parent][child] = req.body[key];
+                updatedFields.push(key);
+            } else {
+                updateData[key] = req.body[key];
+                updatedFields.push(key);
+            }
+        });
+
+        // Use $set and $unset to properly handle null values
+        const setData = {};
+        const unsetData = {};
+
+        Object.keys(updateData).forEach(key => {
+            if (typeof updateData[key] === 'object' && updateData[key] !== null) {
+                Object.keys(updateData[key]).forEach(subKey => {
+                    const fullKey = `${key}.${subKey}`;
+                    if (updateData[key][subKey] === undefined) {
+                        unsetData[fullKey] = "";
+                    } else {
+                        if (!setData[key]) setData[key] = {};
+                        setData[key][subKey] = updateData[key][subKey];
+                    }
+                });
+            } else if (updateData[key] === undefined) {
+                unsetData[key] = "";
+            } else {
+                setData[key] = updateData[key];
+            }
+        });
+
+        const updateOperation = {};
+        if (Object.keys(setData).length > 0) {
+            updateOperation.$set = setData;
+        }
+        if (Object.keys(unsetData).length > 0) {
+            updateOperation.$unset = unsetData;
+        }
+
+        // Update client
+        const updatedClient = await Client.findByIdAndUpdate(
+            decoded.clientId,
+            updateOperation,
+            { new: true, runValidators: true }
+        ).select('-password -tokens -__v');
+
+        // Create audit log
+        const auditLog = {
+            action: 'client_profile_updated',
+            clientId: client._id,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+            status: 'success',
+            metadata: { updatedFields }
+        };
+
+        rabbitMQService.sendToQueue('audit_log_queue', auditLog);
+
+        res.json({
+            status: 'success',
+            message: 'Profile updated successfully',
+            data: { client: updatedClient }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Add API key generation endpoint
+router.post('/api-keys/generate', [
+    body('description').optional().trim().isLength({ max: 100 }).withMessage('Description must be less than 100 characters')
+], async (req, res, next) => {
+    try {
+        console.log(req.body)
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Validation failed',
+                errors: errors.array()
+            });
+        }
+
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({
+                status: 'error',
+                message: 'Authentication token required'
+            });
+        }
+
+        const token = authHeader.split(' ')[1];
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+        } catch (jwtError) {
+            return res.status(401).json({
+                status: 'error',
+                message: 'Invalid or expired token'
+            });
+        }
+
+        const client = await Client.findById(decoded.clientId);
+        if (!client || client.isDeleted) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Client not found'
+            });
+        }
+
+        const { description } = req.body;
+        const newKeySet = client.generateSecureKeys(description, ['read', 'write']);
+
+        await client.save();
+
+        // Create audit log
+        const auditLog = {
+            action: 'api_key_generated',
+            clientId: client._id,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+            status: 'success'
+        };
+
+        rabbitMQService.sendToQueue('audit_log_queue', auditLog);
+
+        res.json({
+            status: 'success',
+            message: 'API key generated successfully',
+            data: {
+                apiKey: newKeySet.apiKey,
+                secretKey: newKeySet.secretKey
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// Add API key toggle endpoint
+router.put('/api-keys/:keyId/toggle', async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({
+                status: 'error',
+                message: 'Authentication token required'
+            });
+        }
+
+        const token = authHeader.split(' ')[1];
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+        } catch (jwtError) {
+            return res.status(401).json({
+                status: 'error',
+                message: 'Invalid or expired token'
+            });
+        }
+
+        const client = await Client.findById(decoded.clientId);
+        if (!client || client.isDeleted) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Client not found'
+            });
+        }
+
+        const apiKey = client.apiKeys.id(req.params.keyId);
+        if (!apiKey) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'API key not found'
+            });
+        }
+
+        apiKey.isActive = !apiKey.isActive;
+        await client.save();
+
+        // Create audit log
+        const auditLog = {
+            action: 'api_key_toggled',
+            clientId: client._id,
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent'),
+            status: 'success',
+            metadata: {
+                keyId: req.params.keyId,
+                newStatus: apiKey.isActive ? 'active' : 'inactive'
+            }
+        };
+
+        rabbitMQService.sendToQueue('audit_log_queue', auditLog);
+
+        res.json({
+            status: 'success',
+            message: `API key ${apiKey.isActive ? 'activated' : 'deactivated'} successfully`,
+            data: { isActive: apiKey.isActive }
         });
     } catch (error) {
         next(error);
