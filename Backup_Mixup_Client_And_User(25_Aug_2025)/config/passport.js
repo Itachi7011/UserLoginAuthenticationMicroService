@@ -6,7 +6,7 @@ const crypto = require('crypto');
 
 // Helper function to generate API key
 const generateApiKey = () => {
-  return 'cl_' + crypto.randomBytes(24).toString('hex');
+  return crypto.randomBytes(32).toString('hex');
 };
 
 
@@ -19,9 +19,9 @@ passport.use('client-google', new GoogleStrategy({
 }, async (req, accessToken, refreshToken, profile, done) => {
   try {
     // Check if client already exists with this Google ID
-    let client = await Client.findOne({
+    let client = await Client.findOne({ 
       'oauth.googleId': profile.id,
-      isDeleted: false
+      isDeleted: false 
     });
 
     if (client) {
@@ -31,11 +31,11 @@ passport.use('client-google', new GoogleStrategy({
     // Check if client exists with the same email
     const email = profile.emails && profile.emails[0].value;
     if (email) {
-      client = await Client.findOne({
+      client = await Client.findOne({ 
         email: email,
-        isDeleted: false
+        isDeleted: false 
       });
-
+      
       if (client) {
         // Link Google account to existing client
         client.oauth.googleId = profile.id;
@@ -47,15 +47,14 @@ passport.use('client-google', new GoogleStrategy({
 
     // Create new client (first-time login)
     const apiKey = generateApiKey();
-    const secretKey = 'cl_sec_' + crypto.randomBytes(32).toString('hex');
-
+    const secretKey = crypto.randomBytes(16).toString('hex');
+    
     client = new Client({
       name: profile.displayName || 'Google OAuth Client',
       email: email,
       website: '', // You might want to prompt for this later
       apiKey,
       secretKey,
-      registerUsing: "google-auth",
       emailVerified: true,
       oauth: {
         googleId: profile.id,
@@ -81,9 +80,9 @@ passport.use('client-github', new GitHubStrategy({
 }, async (req, accessToken, refreshToken, profile, done) => {
   try {
     // Check if client already exists with this GitHub ID
-    let client = await Client.findOne({
+    let client = await Client.findOne({ 
       'oauth.githubId': profile.id,
-      isDeleted: false
+      isDeleted: false 
     });
 
     if (client) {
@@ -92,12 +91,12 @@ passport.use('client-github', new GitHubStrategy({
 
     // Get email from GitHub profile - handle cases where email might be null or private
     let email = null;
-
+    
     // Try to get email from profile emails array
     if (profile.emails && profile.emails.length > 0) {
       email = profile.emails[0].value;
     }
-
+    
     // If no email in profile, try to fetch it using GitHub API
     if (!email) {
       try {
@@ -107,7 +106,7 @@ passport.use('client-github', new GitHubStrategy({
             'User-Agent': 'Your-App-Name'
           }
         });
-
+        
         if (response.ok) {
           const emails = await response.json();
           const primaryEmail = emails.find(e => e.primary && e.verified);
@@ -129,11 +128,11 @@ passport.use('client-github', new GitHubStrategy({
 
     // Check if client exists with the same email (excluding placeholder emails)
     if (email && !email.endsWith('@placeholder.com')) {
-      client = await Client.findOne({
+      client = await Client.findOne({ 
         email: email,
-        isDeleted: false
+        isDeleted: false 
       });
-
+      
       if (client) {
         // Link GitHub account to existing client
         client.oauth.githubId = profile.id;
@@ -145,8 +144,8 @@ passport.use('client-github', new GitHubStrategy({
 
     // Create new client (first-time login)
     const apiKey = generateApiKey();
-    const secretKey = 'cl_sec_' + crypto.randomBytes(32).toString('hex');
-
+    const secretKey = crypto.randomBytes(16).toString('hex');
+    
     client = new Client({
       name: profile.displayName || profile.username || 'GitHub User',
       email: email,

@@ -52,7 +52,6 @@ const ClientSchema = new mongoose.Schema({
             message: "Please enter a valid website URL"
         }
     },
-apiKeys: [{
     apiKey: {
         type: String,
         required: true,
@@ -62,26 +61,6 @@ apiKeys: [{
         type: String,
         required: true
     },
-    createdAt: {
-        type: Date,
-        default: Date.now
-    },
-    isActive: {
-        type: Boolean,
-        default: true
-    },
-    lastUsed: Date,
-    description: String,
-    permissions: {
-        type: [String],
-        enum: ['read', 'write', 'admin', 'billing'],
-        default: ['read']
-    },
-    rateLimit: {
-        type: Number,
-        default: 60 // requests per minute
-    }
-}],
     authConfig: {
         allowedRedirectURIs: [{
             type: String,
@@ -277,10 +256,6 @@ apiKeys: [{
         githubId: String,
         profile: mongoose.Schema.Types.Mixed
     },
-    registerUsing: {
-        type: String,
-        enum: ['registration', 'google-auth', 'github-auth',],
-    },
     loginAttempts: {
         type: Number,
         default: 0
@@ -293,26 +268,15 @@ apiKeys: [{
 });
 
 
-// ClientSchema.index({ email: 1 });
-// ClientSchema.index({ apiKey: 1 });
-ClientSchema.index({ 'tokens.token': 1 });
-ClientSchema.index({ isActive: 1, isBlocked: 1 });
+ClientSchema.index({ email: 1 });
+ClientSchema.index({ apiKey: 1 });
+ClientSchema.index({ 'tokens.token': 1 }); // For faster token lookups
+ClientSchema.index({ isActive: 1, isBlocked: 1 }); // For filtering active clients
 
-ClientSchema.methods.generateSecureKeys = function(description = '', permissions = ['read']) {
+ClientSchema.methods.generateSecureKeys = function () {
     const crypto = require('crypto');
-    
-    const newKeySet = {
-        apiKey: 'cl_' + crypto.randomBytes(24).toString('hex'),
-        secretKey: 'cl_sec_' + crypto.randomBytes(32).toString('hex'),
-        createdAt: new Date(),
-        isActive: true,
-        description: description,
-        permissions: permissions,
-        rateLimit: 60
-    };
-    
-    this.apiKeys.push(newKeySet);
-    return newKeySet; // Return the generated keys
+    this.apiKey = 'cl_' + crypto.randomBytes(24).toString('hex');
+    this.secretKey = 'cl_sec_' + crypto.randomBytes(32).toString('hex');
 };
 
 // Virtual for checking if account is locked
@@ -360,4 +324,4 @@ ClientSchema.methods.incrementLoginAttempts = async function () {
     return this.save();
 };
 
-module.exports = mongoose.model(`${process.env.APP_NAME}_Client`, ClientSchema);
+module.exports = mongoose.model('Login_Saas_Client', ClientSchema);

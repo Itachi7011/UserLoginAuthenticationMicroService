@@ -287,4 +287,4 @@ UserSchema.methods.incrementLoginAttempts = function () {
     return this.updateOne(updates);
 };
 
-module.exports = mongoose.model(`${process.env.APP_NAME}_User`, UserSchema);
+module.exports = mongoose.model('Login_Saas_User', UserSchema);

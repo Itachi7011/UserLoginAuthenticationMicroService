@@ -16,13 +16,13 @@ const passport = require('passport');
 // Import RabbitMQ service
 const rabbitMQService = require('./services/rabbitmq');
 
-require('./config/passport');
+require('./config/passport'); 
 
-// const authRoutes = require('./routes/auth');
-// const userRoutes = require('./routes/users');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
 const clientRoutes = require('./routes/clients');
-// const adminRoutes = require('./routes/admin');
-// const clientAuthRoutes = require('./routes/clientAuth');
+const adminRoutes = require('./routes/admin');
+const clientAuthRoutes = require('./routes/clientAuth');
 
 
 const app = express();
@@ -30,12 +30,13 @@ const app = express();
 // Security middleware
 app.use(helmet());
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production'
-        ? ['https://login-system-testing.netlify.app']
-        : ['http://localhost:5173', 'https://login-system-testing.netlify.app'],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, curl requests)
+        if (!origin) return callback(null, true);
+
+        // You can add your domain validation logic here
+        callback(null, true);
+    },
     credentials: true
 }));
 
@@ -69,28 +70,28 @@ app.use(hpp());
 app.use(compression());
 
 // Routes
-// app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/clients', clientRoutes);
-// app.use('/api/admin', adminRoutes);
-// app.use('/api/client-auth', clientAuthRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/client-auth', clientAuthRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.status(200).json({
-        status: 'success',
-        message: 'Server is running',
-        timestamp: new Date().toISOString(),
-        rabbitmq: rabbitMQService.isReady() ? 'connected' : 'disconnected'
-    });
+  res.status(200).json({
+    status: 'success',
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    rabbitmq: rabbitMQService.isReady() ? 'connected' : 'disconnected'
+  });
 });
 
 // 404 handler
 app.all('/:id', (req, res) => {
-    res.status(404).json({
-        status: 'error',
-        message: `Can't find ${req.originalUrl} on this server!`
-    });
+  res.status(404).json({
+    status: 'error',
+    message: `Can't find ${req.originalUrl} on this server!`
+  });
 });
 
 // Global error handler
